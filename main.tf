@@ -1,64 +1,65 @@
+variable "hcloud_token" {}
+
 terraform {
   required_providers {
-    exoscale = {
-      source  = "exoscale/exoscale"
-      version = "0.22.0"
+    hcloud = {
+      source = "hetznercloud/hcloud"
+      version = "1.25.2"
     }
   }
 }
 
 locals {
-  zone = "ch-gva-2"
-  vhost = "dokku-demo.isc.heia-fr.ch"
+  vhost = "artdaimer.wngr.ch"
 }
 
-resource "exoscale_ipaddress" "dokku_server" {
-    zone = local.zone
+provider "hcloud" {
+  token = var.hcloud_token
 }
 
-resource "exoscale_security_group" "webservers" {
-  name        = "web"
-  description = "Webservers"
+# # ssh key
+resource "hcloud_ssh_key" "default" {
+  name = "main ssh key"
+  public_key = "${file("~/.ssh/id_ed25519.pub")}"
 }
 
-resource "exoscale_security_group_rules" "web" {
-  security_group_id = exoscale_security_group.webservers.id
-
-  ingress {
-    protocol  = "TCP"
-    ports     = ["22", "80", "443"]
-    cidr_list = ["0.0.0.0/0", "::/0"]
-  }
+resource "hcloud_network" "network" {
+  name     = "network"
+  ip_range = "10.0.0.0/16"
 }
 
-data "exoscale_compute_template" "ubuntu" {
-  zone = local.zone
-  name = "Linux Ubuntu 20.04 LTS 64-bit"
+resource "hcloud_network_subnet" "network-subnet" {
+  type         = "cloud"
+  network_id   = hcloud_network.network.id
+  network_zone = "eu-central"
+  ip_range     = "10.0.1.0/24"
 }
 
-resource "exoscale_compute" "dokku_server" {
-  zone = local.zone
-  display_name = "dokku-server"
-  state = "Running"
-  hostname = "dokku-demo"
-  keyboard = "fr-ch"
-  template_id = data.exoscale_compute_template.ubuntu.id
-  security_group_ids = [exoscale_security_group.webservers.id]
-  size = "Medium"
-  disk_size = 50
-  key_pair     = "supcik@heia-fr"
+resource "hcloud_floating_ip_assignment" "main" {
+  floating_ip_id = hcloud_floating_ip.floating_ip_1.id
+  server_id = hcloud_server.dokku_server.id
+}
 
-  timeouts {
-    delete = "10m"
-  }
+
+resource "hcloud_floating_ip" "floating_ip_1" {
+  type = "ipv4"
+  home_location = "nbg1"
+  name = "floating-ip-v2"
+}
+
+
+resource "hcloud_server" "dokku_server" {
+  name = "dokku-server"
+  server_type = "cx11"
+  image = "ubuntu-20.04"
+  location = "nbg1"
+  ssh_keys = [hcloud_ssh_key.default.id]
   
   user_data    = <<EOF
 #cloud-config
 package_upgrade: true
 runcmd:
-  - wget -nv -O - https://github.com/supcik.keys     | grep ed25519 | sed '1q;d' >> /home/ubuntu/.ssh/authorized_keys
-  - wget -nv -O - https://github.com/derlin.keys     | grep ed25519 | sed '1q;d' >> /home/ubuntu/.ssh/authorized_keys
-  - wget -nv -O - https://github.com/damieng002.keys | grep ed25519 | sed '1q;d' >> /home/ubuntu/.ssh/authorized_keys
+  - wget -nv -O - https://github.com/olivierwenger.keys     | grep ed25519 | sed '1q;d' >> /home/ubuntu/.ssh/authorized_keys
   - echo "dokku dokku/web_config boolean false"              | debconf-set-selections
   - echo "dokku dokku/vhost_enable boolean true"             | debconf-set-selections
   - echo "dokku dokku/hostname string ${local.vhost}"        | debconf-set-selections
@@ -75,14 +76,21 @@ runcmd:
   - [ apt-get, -qq, -y, install, dokku ]
   - [ dokku, plugin:install-dependencies, --core ]
   - [ dokku, "domains:set-global", ${local.vhost} ]
-  - wget -nv -O - https://github.com/supcik.keys     | grep ed25519 | sed '1q;d' | dokku ssh-keys:add jacques
-  - wget -nv -O - https://github.com/derlin.keys     | grep ed25519 | sed '1q;d' | dokku ssh-keys:add lucy
-  - wget -nv -O - https://github.com/damieng002.keys | grep ed25519 | sed '1q;d' | dokku ssh-keys:add damien
+  - wget -nv -O - https://github.com/olivierwenger.keys     | grep ed25519 | sed '1q;d' | dokku ssh-keys:add olivier
   - [ dokku, plugin:install, https://github.com/dokku/dokku-letsencrypt.git ]
 EOF
+
+  network {
+    network_id = hcloud_network.network.id
+    ip         = "10.0.1.5"
+    alias_ips  = [
+      "10.0.1.6",
+      "10.0.1.7"
+    ]
+  }
+
+  depends_on = [
+    hcloud_network_subnet.network-subnet
+  ]
 }
 
-resource "exoscale_secondary_ipaddress" "dokku_server" {
-  compute_id = exoscale_compute.dokku_server.id
-  ip_address = exoscale_ipaddress.dokku_server.ip_address
-}
