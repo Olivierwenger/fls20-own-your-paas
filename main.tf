@@ -78,6 +78,7 @@ runcmd:
   - [ dokku, "domains:set-global", ${local.vhost} ]
   - wget -nv -O - https://github.com/olivierwenger.keys     | grep ed25519 | sed '1q;d' | dokku ssh-keys:add olivier
   - [ dokku, plugin:install, https://github.com/dokku/dokku-letsencrypt.git ]
+  - [ dokku, plugin:install, https://github.com/dokku/dokku-mariadb.git ]
 EOF
 
   network {
