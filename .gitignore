@@ -3,6 +3,7 @@
 *.tfstate.backup
 *.tfstate.*.backup
 .terraform.*
-
+*.tfvars
+*.idea
 /post-install.tar.gz
 /post-install/51-eip.yaml
