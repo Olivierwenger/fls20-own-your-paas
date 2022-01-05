@@ -40,11 +40,22 @@ resource "hcloud_floating_ip_assignment" "main" {
   server_id = hcloud_server.dokku_server.id
 }
 
+resource "hcloud_floating_ip_assignment" "main_ipv6" {
+  floating_ip_id = hcloud_floating_ip.floating_ip_3.id
+  server_id = hcloud_server.dokku_server.id
+}
 
 resource "hcloud_floating_ip" "floating_ip_1" {
   type = "ipv4"
   home_location = "nbg1"
   name = "floating-ip-v2"
+}
+
+
+resource "hcloud_floating_ip" "floating_ip_3" {
+  type = "ipv6"
+  home_location = "nbg1"
+  name = "floating-ip-v3"
 }
 
 
