@@ -20,7 +20,7 @@ provider "hcloud" {
 # # ssh key
 resource "hcloud_ssh_key" "default" {
   name = "main ssh key"
-  public_key = "${file("~/.ssh/id_ed25519.pub")}"
+  public_key = "${file("~/.ssh/id_rsa.pub")}"
 }
 
 resource "hcloud_network" "network" {
